@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>2年生一斉！進研模試小問集合対戦アプリ</title>
+
+  <!-- MathJax (数式表示ライブラリ: 非同期安全読み込み) -->
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" id="MathJax-script" async></script>
+
+  <!-- Firebase SDK (Compat) -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
+
+  <style>
+    :root {
+      --primary-color: #3f51b5;
+      --secondary-color: #f50057;
+      --bg-color: #f5f5f5;
+      --card-bg: #ffffff;
+      --text-color: #333333;
+    }
+
+    body {
+      font-family: "Helvetica Neue", Arial, "Hiragino Kaku Gothic ProN", "Hiragino Sans", Meiryo, sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      margin: 0;
+      padding: 16px;
+      display: flex;
+      justify-content: center;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 850px;
+      background: var(--card-bg);
+      border-radius: 12px;
+      padding: 24px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+
+    h1, h2, h3 {
+      text-align: center;
+      color: var(--primary-color);
+    }
+
+    .screen {
+      display: none;
+    }
+
+    .screen.active {
+      display: block;
+    }
+
+    .input-group {
+      margin-bottom: 16px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 6px;
+      font-weight: bold;
+    }
+
+    input[type="text"], input[type="number"], input[type="password"], select, textarea {
+      width: 100%;
+      padding: 10px;
+      font-size: 16px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      box-sizing: border-box;
+    }
+
+    textarea {
+      resize: vertical;
+      min-height: 70px;
+    }
+
+    .btn {
+      width: 100%;
+      padding: 12px;
+      font-size: 16px;
+      font-weight: bold;
+      color: #fff;
+      background-color: var(--primary-color);
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      margin-top: 8px;
+      transition: background-color 0.2s;
+    }
+
+    .btn:hover { background-color: #303f9f; }
+    .btn-secondary { background-color: #757575; }
+    .btn-secondary:hover { background-color: #616161; }
+    .btn-solo { background-color: #4caf50; }
+    .btn-solo:hover { background-color: #388e3c; }
+    .btn-host { background-color: #ff9800; }
+    .btn-host:hover { background-color: #f57c00; }
+    .btn-danger { background-color: #f44336; }
+    .btn-danger:hover { background-color: #d32f2f; }
+
+    .options-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-top: 16px;
+    }
+
+    .option-btn {
+      padding: 16px;
+      font-size: 18px;
+      font-weight: bold;
+      background-color: #e0e0e0;
+      border: 2px solid #bdbdbd;
+      border-radius: 8px;
+      cursor: pointer;
+      text-align: center;
+    }
+
+    .option-btn:hover { background-color: #d6d6d6; }
+
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: rgba(0,0,0,0.5);
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+    }
+
+    .modal-content {
+      background: #fff;
+      padding: 24px;
+      border-radius: 12px;
+      width: 90%;
+      max-width: 400px;
+    }
+
+    .error-msg {
+      color: red;
+      font-size: 14px;
+      margin-top: 8px;
+      display: none;
+    }
+
+    .question-box {
+      background-color: #f9f9f9;
+      border-left: 4px solid var(--primary-color);
+      padding: 16px;
+      font-size: 18px;
+      margin-bottom: 20px;
+      min-height: 80px;
+    }
+
+    .ranking-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 16px;
+    }
+
+    .ranking-table th, .ranking-table td {
+      border: 1px solid #ddd;
+      padding: 10px;
+      text-align: center;
+    }
+
+    .ranking-table th {
+      background-color: var(--primary-color);
+      color: white;
+    }
+
+    .q-edit-card {
+      border: 1px solid #ddd;
+      background: #fafafa;
+      padding: 16px;
+      border-radius: 8px;
+      margin-bottom: 16px;
+    }
+    .q-edit-options {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: 8px;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+
+  <!-- 1. エントリー画面 -->
+  <div id="entryScreen" class="screen active">
+    <h1>2年生一斉！小問完全攻略バトル</h1>
+    
+    <div class="input-group">
+      <label for="playerName">プレイヤー名</label>
+      <input type="text" id="playerName" placeholder="名前を入力（例：山田太郎）">
+    </div>
+
+    <div class="input-group">
+      <label for="classSelect">所属クラス</label>
+      <select id="classSelect">
+        <option value="1組">1組</option>
+        <option value="2組">2組</option>
+        <option value="3組">3組</option>
+        <option value="4組">4組</option>
+        <option value="5組">5組</option>
+        <option value="6組">6組</option>
+        <option value="7組">7組</option>
+      </select>
+    </div>
+
+    <div class="input-group">
+      <label for="gameMode">対戦モード</label>
+      <select id="gameMode">
+        <option value="individual">⚔️ 個人戦</option>
+        <option value="team">🚩 クラス対抗戦</option>
+      </select>
+    </div>
+
+    <div class="input-group">
+      <label for="roomId">ルームID</label>
+      <input type="text" id="roomId" placeholder="例: 2026" value="2026">
+    </div>
+
+    <button class="btn" onclick="joinLobby()">対戦ロビーに参加する</button>
+    <button class="btn btn-solo" onclick="startSoloMode()">一人で練習する (ソロモード)</button>
+    <hr style="margin: 20px 0;">
+    <button class="btn btn-host" onclick="openHostAuth()">教員用管理画面へ</button>
+  </div>
+
+  <!-- 2. 生徒ロビー画面 -->
+  <div id="lobbyScreen" class="screen">
+    <h2>対戦待機ロビー</h2>
+    <p>ルームID: <strong id="displayRoomId">-</strong></p>
+    <p>現在の接続参加者数: <strong id="participantCount">0</strong> 人</p>
+    <p style="text-align: center; color: #666;">※ホスト（教員）が試合を開始するまでお待ちください。</p>
+  </div>
+
+  <!-- 3. クイズ対戦画面 -->
+  <div id="quizScreen" class="screen">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+      <span id="questionProgress">第 1 / 3 問</span>
+    </div>
+    
+    <div class="question-box" id="questionText">
+      問題文がここに表示されます。
+    </div>
+
+    <div class="options-grid" id="optionsContainer"></div>
+  </div>
+
+  <!-- 4. 結果画面 -->
+  <div id="resultScreen" class="screen">
+    <h2>対戦結果</h2>
+    <p style="text-align: center; font-size: 20px;" id="personalResult">あなたのスコア: 0 点</p>
+
+    <h3>全体ランキング</h3>
+    <table class="ranking-table">
+      <thead>
+        <tr>
+          <th>順位</th>
+          <th>名前</th>
+          <th>クラス</th>
+          <th>スコア</th>
+        </tr>
+      </thead>
+      <tbody id="rankingBody"></tbody>
+    </table>
+
+    <button class="btn btn-secondary" onclick="location.reload()" style="margin-top: 20px;">トップに戻る</button>
+  </div>
+
+  <!-- 5. ホスト（教員）管理画面 -->
+  <div id="hostScreen" class="screen">
+    <h2>教員用管理画面</h2>
+    <p>ルームID: <strong id="hostDisplayRoomId">2026</strong></p>
+    <p>現在の接続参加者数: <strong id="hostParticipantCount">0</strong> 人</p>
+
+    <button class="btn" onclick="startHostGame()" style="background-color: #2196F3; margin-bottom: 20px;">全員の対戦を一斉スタート</button>
+    
+    <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+      <button class="btn btn-secondary" onclick="toggleEditor(true)">📝 問題の編集・追加</button>
+      <button class="btn btn-secondary" onclick="exportQuestionsJSON()">📥 JSON書き出し</button>
+      <button class="btn btn-secondary" onclick="document.getElementById('importFile').click()">📤 JSON読み込み</button>
+      <input type="file" id="importFile" accept=".json" style="display:none" onchange="importQuestionsJSON(event)">
+    </div>
+
+    <h3>リアルタイム順位</h3>
+    <table class="ranking-table">
+      <thead>
+        <tr>
+          <th>順位</th>
+          <th>名前</th>
+          <th>クラス</th>
+          <th>スコア</th>
+        </tr>
+      </thead>
+      <tbody id="hostRankingBody"></tbody>
+    </table>
+
+    <button class="btn btn-secondary" onclick="location.reload()" style="margin-top: 20px;">ログアウト・戻る</button>
+  </div>
+
+  <!-- 6. 問題編集画面 -->
+  <div id="editorScreen" class="screen">
+    <h2>問題セットの編集・追加</h2>
+    <p style="font-size: 14px; color: #666;">MathJax形式（`\( ... \)` や `$$ ... $$`）で数式を記述できます。</p>
+    
+    <div id="questionsEditorContainer"></div>
+
+    <button class="btn btn-solo" onclick="addNewQuestionField()">＋ 新しい問題を追加</button>
+    <button class="btn" onclick="saveEditedQuestions()" style="margin-top: 12px;">保存して管理画面へ戻る</button>
+    <button class="btn btn-secondary" onclick="toggleEditor(false)">キャンセル</button>
+  </div>
+
+</div>
+
+<!-- パスワード認証モーダル -->
+<div id="hostAuthModal" class="modal">
+  <div class="modal-content">
+    <h3>教員用管理画面ログイン</h3>
+    <p>管理用パスワードを入力してください。</p>
+    <input type="password" id="hostPasswordInput" placeholder="パスワードを入力">
+    <button class="btn" onclick="verifyHostPassword()">ログイン</button>
+    <button class="btn btn-secondary" onclick="closeHostAuth()">キャンセル</button>
+    <p id="authErrorMessage" class="error-msg">パスワードが間違っています</p>
+  </div>
+</div>
+
+<script>
+  // Firebase 設定
+  const firebaseConfig = {
+    apiKey: "YOUR_API_KEY",
+    authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+    projectId: "YOUR_PROJECT_ID",
+    storageBucket: "YOUR_PROJECT_ID.appspot.com",
+    messagingSenderId: "YOUR_SENDER_ID",
+    appId: "YOUR_APP_ID"
+  };
+
+  let db = null;
+  try {
+    if (firebase && firebase.apps.length === 0) {
+      firebase.initializeApp(firebaseConfig);
+      db = firebase.firestore();
+    }
+  } catch (e) {
+    console.warn("ローカル動作モードで起動します。");
+  }
+
+  const HOST_PASSWORD = "teacher2026";
+  let isHostAuthenticated = false;
+  let isSoloMode = false;
+  
+  let myName = "";
+  let myClass = "";
+  let myRoomId = "";
+  let myMode = "individual";
+  let currentQuestionIndex = 0;
+  let myScore = 0;
+
+  let questions = [
+    {
+      q: "【小問集合1】次の式を展開しなさい。<br>\\((2x - 3y)(4x + 5y)\\)",
+      options: [
+        "\\(8x^2 - 2xy - 15y^2\\)",
+        "\\(8x^2 + 2xy - 15y^2\\)",
+        "\\(8x^2 - 22xy - 15y^2\\)",
+        "\\(8x^2 - 15y^2\\)"
+      ],
+      answer: 0
+    },
+    {
+      q: "【小問集合2】2次不等式 \\(x^2 - 4x - 5 < 0\\) を解け。",
+      options: [
+        "\\(-1 < x < 5\\)",
+        "\\(x < -1, 5 < x\\)",
+        "\\(-5 < x < 1\\)",
+        "\\(x < -5, 1 < x\\)"
+      ],
+      answer: 0
+    },
+    {
+      q: "【小問集合3】\\(\\triangle ABC\\) において、\\(b=4, c=5, A=60^\\circ\\) のとき、辺 \\(a\\) の長さを求めよ。",
+      options: [
+        "\\(\\sqrt{21}\\)",
+        "\\(\\sqrt{41}\\)",
+        "\\(21\\)",
+        "\\(\\sqrt{61}\\)"
+      ],
+      answer: 0
+    }
+  ];
+
+  try {
+    const savedQ = localStorage.getItem('shinken_quiz_questions');
+    if (savedQ) questions = JSON.parse(savedQ);
+  } catch(e) {}
+
+  function updateMathJax() {
+    if (window.MathJax && window.MathJax.typesetPromise) {
+      window.MathJax.typesetPromise().catch(err => console.log(err));
+    }
+  }
+
+  function showScreen(screenId) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById(screenId).classList.add('active');
+    updateMathJax();
+  }
+
+  function openHostAuth() {
+    if (isHostAuthenticated) {
+      showScreen('hostScreen');
+      return;
+    }
+    document.getElementById('hostAuthModal').style.display = 'flex';
+    document.getElementById('hostPasswordInput').value = '';
+    document.getElementById('authErrorMessage').style.display = 'none';
+  }
+
+  function closeHostAuth() {
+    document.getElementById('hostAuthModal').style.display = 'none';
+  }
+
+  function verifyHostPassword() {
+    const pass = document.getElementById('hostPasswordInput').value;
+    if (pass === HOST_PASSWORD) {
+      isHostAuthenticated = true;
+      closeHostAuth();
+      myRoomId = document.getElementById('roomId').value || "2026";
+      document.getElementById('hostDisplayRoomId').innerText = myRoomId;
+      showScreen('hostScreen');
+      listenParticipantsAsHost();
+    } else {
+      document.getElementById('authErrorMessage').style.display = 'block';
+    }
+  }
+
+  function joinLobby() {
+    myName = document.getElementById('playerName').value.trim();
+    myClass = document.getElementById('classSelect').value;
+    myRoomId = document.getElementById('roomId').value.trim();
+    myMode = document.getElementById('gameMode').value;
+
+    if (!myName || !myRoomId) {
+      alert("名前とルームIDを入力してください。");
+      return;
+    }
+
+    document.getElementById('displayRoomId').innerText = myRoomId;
+    showScreen('lobbyScreen');
+
+    if (db) {
+      db.collection(`room_${myRoomId}_users`).doc(myName).set({
+        name: myName, class: myClass, score: 0, mode: myMode
+      });
+
+      db.collection(`room_${myRoomId}_users`).onSnapshot(snapshot => {
+        document.getElementById('participantCount').innerText = snapshot.size;
+      });
+
+      db.collection('rooms').doc(myRoomId).onSnapshot(doc => {
+        if (doc.exists && doc.data().status === 'started') {
+          if (doc.data().questions) questions = doc.data().questions;
+          startQuizGame();
+        }
+      });
+    }
+  }
+
+  function startSoloMode() {
+    isSoloMode = true;
+    myName = document.getElementById('playerName').value.trim() || "ゲスト";
+    myClass = document.getElementById('classSelect').value;
+    startQuizGame();
+  }
+
+  function startQuizGame() {
+    currentQuestionIndex = 0;
+    myScore = 0;
+    showScreen('quizScreen');
+    renderQuestion();
+  }
+
+  function renderQuestion() {
+    const qData = questions[currentQuestionIndex];
+    document.getElementById('questionProgress').innerText = `第 ${currentQuestionIndex + 1} / ${questions.length} 問`;
+    document.getElementById('questionText').innerHTML = qData.q;
+
+    const container = document.getElementById('optionsContainer');
+    container.innerHTML = '';
+
+    q
